@@ -1,19 +1,15 @@
 # Prosthetic Calibration Demo
 
-## Overview
+## Live Demos
 
-This is a **dummy proof-of-concept** for an intelligent prosthetic limb calibration system. This project is a non-functional simulation designed to demonstrate the architecture and key components of an AI-powered prosthetic calibration system.
+Explore the interactive demonstrations:
 
-## Purpose
+- **[Ragdoll Stickman Demo](demo/ragdoll-stickman.html)** - Physics-based ragdoll simulation with real-time sensor data, manual tuning controls, energy expenditure metrics, and predictive maintenance alerts for prosthetic calibration.
+- **[Stickman IK Demo](demo/stickman-ik.html)** - Inverse kinematics demonstration showing limb positioning and joint control mechanisms.
 
-The goal is to showcase how an intelligent calibration system could work for prosthetic limbs that continuously adapts to the unique gait and motion patterns of users. This demo provides a visual and interactive framework without actual sensor integration or machine learning functionality.
+## System Components
 
-## Key Components
-
-### 1. **Stickman Simulation with Inverse Kinematics**
-- Visual representation of prosthetic limb movement
-- Controllable stickman character demonstrating gait patterns
-- Inverse kinematics for realistic joint movement simulation
+### 1. **Physics Simulation (Matter.js)**
 - Interactive controls for adjusting limb parameters
 
 ### 2. **FastAPI Backend**
