@@ -7,17 +7,17 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <style>
     :root { --bg:#0f1220; --panel:#161a2e; --panel-2:#1c2140; --text:#e6e9f5; --muted:#aab0d6; --accent:#6ae3ff; --alert:#ff6a6a; --ok:#70f0a8; }
-    html, body { height:100%; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:var(--text); background:linear-gradient(180deg,#0b0e1a 0%,#0f1220 100%); display:grid; grid-template-columns:320px 1fr; grid-template-rows:auto 1fr; grid-template-areas:"header header" "sidebar main"; }
-    header { grid-area:header; padding:12px 16px; background:#0b0e1a; border-bottom:1px solid #20264b; display:flex; gap:12px; align-items:center; justify-content:space-between; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: system-ui,-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: var(--text); background: linear-gradient(180deg,#0b0e1a 0%,#0f1220 100%); display: grid; grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; grid-template-areas: "header header" "sidebar main"; }
+    header { grid-area: header; padding: 12px 16px; background:#0b0e1a; border-bottom:1px solid #20264b; display:flex; gap:12px; align-items:center; justify-content:space-between; }
     header h1 { font-size:16px; margin:0; font-weight:600; letter-spacing:0.2px; }
     header .sub { color:var(--muted); font-size:12px; }
-    aside { grid-area:sidebar; background:var(--panel); border-right:1px solid #20264b; padding:12px; overflow:auto; }
-    main { grid-area:main; position:relative; }
+    aside { grid-area: sidebar; background:var(--panel); border-right:1px solid #20264b; padding:12px; overflow:auto; }
+    main { grid-area: main; position:relative; }
     canvas { display:block; margin:0 auto; background:#0c0f1d; }
     .group { background:var(--panel-2); border:1px solid #20264b; border-radius:8px; padding:10px; margin-bottom:10px; }
     .group h3 { margin:0 0 8px; font-size:13px; color:var(--muted); font-weight:600; }
-    .kv { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; font-size:12px; }
+    .kv { display:grid; grid-template-columns: 1fr auto; gap:6px 10px; align-items:center; font-size:12px; }
     .kv .val { color:var(--accent); font-variant-numeric: tabular-nums; }
     .slider { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; font-size:12px; margin:6px 0; }
     input[type="range"] { width:100%; accent-color:var(--accent); }
@@ -31,75 +31,81 @@
     .overlay { position:absolute; right:12px; top:12px; z-index:10; display:grid; gap:8px; max-width:320px; }
     .overlay .panel { background:rgba(28,33,64,0.85); backdrop-filter: blur(6px); border:1px solid #273061; border-radius:8px; padding:8px 10px; font-size:12px; }
     .alert { position:absolute; left:50%; transform:translateX(-50%); top:16px; z-index:20; background:#2a1630; border:1px solid #7b2c85; color:#ffd8ff; padding:10px 14px; border-radius:10px; font-size:13px; display:none; }
+    .learn { display:grid; gap:6px; }
+    .bar { height:8px; background:#10163a; border:1px solid #273061; border-radius:999px; overflow:hidden; }
+    .bar > span { display:block; height:100%; width:0%; background:linear-gradient(90deg,#44d07a,#6ae3ff); transition:width 0.6s ease; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Intelligent Prosthetic Calibration Demo</h1>
-    <div class="sub">Physics ragdoll + sensors + tuning + maintenance alerts</div>
+    <div>
+      <h1>Prosthetic Calibration - Ragdoll Stickman</h1>
+      <div class="sub">Stickman centers on load; right leg highlighted; learns smoother gait over time</div>
+    </div>
+    <div id="healthPill" class="pill ok">OK</div>
   </header>
   <aside>
     <div class="group">
-      <h3>Sensor Telemetry (simulated)</h3>
-      <div class="kv">
-        <div>Knee Angle (R)</div><div class="val" id="kneeR">0°</div>
-        <div>Ankle Angle (R)</div><div class="val" id="ankleR">0°</div>
-        <div>Knee Angle (L)</div><div class="val" id="kneeL">0°</div>
-        <div>Ankle Angle (L)</div><div class="val" id="ankleL">0°</div>
-        <div>Joint Resistance</div><div class="val" id="resistance">0.00</div>
-      </div>
+      <h3>Physics tuning</h3>
+      <div class="slider"><label>Torque</label><input id="torque" type="range" min="0.5" max="2.0" step="0.05" value="1.0"/><input id="torqueNum" class="num" type="number" min="0.5" max="2.0" step="0.05" value="1.0"/></div>
+      <div class="slider"><label>Restitution</label><input id="rest" type="range" min="0" max="0.9" step="0.01" value="0.30"/><input id="restNum" class="num" type="number" min="0" max="0.9" step="0.01" value="0.30"/></div>
+      <div class="slider"><label>Balance bias</label><input id="balance" type="range" min="-2" max="2" step="0.05" value="0"/><input id="balanceNum" class="num" type="number" min="-2" max="2" step="0.05" value="0"/></div>
+      <label class="toggle"><input type="checkbox" id="showEnergy"/> Show energy panel</label>
     </div>
     <div class="group">
-      <h3>Manual Tuning</h3>
-      <label class="slider">Torque <input type="range" id="torque" min="0" max="2" step="0.01" value="1"><input class="num" id="torqueNum" type="number" step="0.01" min="0" max="2" value="1"></label>
-      <label class="slider">Resistance <input type="range" id="rest" min="0" max="1" step="0.01" value="0.3"><input class="num" id="restNum" type="number" step="0.01" min="0" max="1" value="0.3"></label>
-      <label class="slider">Balance <input type="range" id="balance" min="-1" max="1" step="0.01" value="0"><input class="num" id="balanceNum" type="number" step="0.01" min="-1" max="1" value="0"></label>
-      <div class="row">
-        <label class="toggle"><input type="checkbox" id="showEnergy" checked> Show energy & comfort</label>
-        <span id="healthPill" class="pill ok">OK</span>
-      </div>
-    </div>
-    <div class="group">
-      <h3>About</h3>
-      <div style="font-size:12px;color:var(--muted)">
-        - Drag any limb to interact.<br/>
-        - Sliders affect restitution, friction, and body forces.<br/>
-        - Alerts trigger if knee/ankle exceed safe angles for several frames.
-      </div>
+      <h3>Live metrics</h3>
+      <div class="kv"><div>Knee (R / L)</div><div class="val"><span id="kneeR">0°</span> / <span id="kneeL">0°</span></div></div>
+      <div class="kv"><div>Ankle (R / L)</div><div class="val"><span id="ankleR">0°</span> / <span id="ankleL">0°</span></div></div>
+      <div class="kv"><div>Resistance</div><div class="val" id="resistance">0.30</div></div>
+      <div class="kv"><div>Comfort</div><div class="val" id="comfort">100</div></div>
+      <div class="kv"><div>Energy</div><div class="val" id="energy">0.00</div></div>
+      <div class="kv"><div>Steps</div><div class="val" id="steps">0</div></div>
+      <div class="kv"><div>Cadence</div><div class="val" id="cadence">0.00</div></div>
     </div>
   </aside>
   <main>
     <div class="overlay">
-      <div class="panel" id="energyPanel">
-        <div>Energy Expenditure: <span id="energy">0.0</span> J</div>
-        <div>Comfort Score: <span id="comfort">100</span>/100</div>
+      <div class="panel learn">
+        <div><strong>Learning progress</strong> <span id="learnPct" style="float:right;">0%</span></div>
+        <div class="bar"><span id="learnBar"></span></div>
+        <div id="learnMsg" style="color:var(--muted)">Initializing gait policy…</div>
       </div>
-      <div class="panel">
-        <div>Step Count: <span id="steps">0</span></div>
-        <div>Cadence: <span id="cadence">0.0</span> steps/s</div>
-      </div>
+      <div id="energyPanel" class="panel" style="display:none">Energy and comfort reflect effort and instability over time.</div>
     </div>
-    <div id="alert" class="alert">Predictive Alert: Joint misalignment risk. Check knee/ankle configuration.</div>
+    <div id="alert" class="alert">High joint stress detected. Adjust parameters or wait for learning.</div>
+    <canvas id="scene" width="900" height="540"></canvas>
   </main>
+
   <script>
-    const { Engine, Render, World, Bodies, Body, Constraint, Mouse, MouseConstraint, Runner, Vector } = Matter;
-    const width = 900, height = 560;
+    const { Engine, Render, Runner, Bodies, Body, World, Constraint, Mouse, MouseConstraint, Events, Vector } = Matter;
+    const canvas = document.getElementById('scene');
+    const width = canvas.width; const height = canvas.height;
     const engine = Engine.create();
+    const render = Render.create({ canvas, engine, options: { width, height, wireframes: false, background: '#0c0f1d' } });
     const runner = Runner.create();
-    const render = Render.create({ element: document.querySelector('main'), engine, options: { width, height, wireframes: false, background: '#0b0f1f' }});
-    function rect(x, y, w, h, opts={}) { return Bodies.rectangle(x, y, w, h, { chamfer:{ radius: h*0.48 }, render:{ fillStyle:'#6b7cff' }, friction:0.4, restitution:0.3, ...opts }); }
-    const head = Bodies.circle(300, 120, 18, { density:0.001, restitution:0.1, render:{ fillStyle:'#a0a6ff' }});
-    const torso = rect(300, 180, 26, 90, { density:0.002, render:{ fillStyle:'#4a56d4' }});
-    const upperArmR = rect(270, 155, 54, 12);
-    const lowerArmR = rect(230, 155, 54, 12);
-    const upperArmL = rect(330, 155, 54, 12);
-    const lowerArmL = rect(370, 155, 54, 12);
-    const upperLegR = rect(285, 230, 18, 68);
-    const lowerLegR = rect(285, 290, 16, 70);
-    const upperLegL = rect(315, 230, 18, 68);
-    const lowerLegL = rect(315, 290, 16, 70);
-    function pin(bodyA, bodyB, pointA, pointB, len=0, stiff=0.6){ return Constraint.create({ bodyA, bodyB, pointA, pointB, length: len, stiffness: stiff, render:{ strokeStyle:'#3a436f' } }); }
-    const joints = [
+
+    // Helper factory
+    function rect(x,y,w,h, opts={}){
+      return Bodies.rectangle(x,y,w,h,{ chamfer:{ radius: h*0.48 }, render:{ fillStyle:'#6b7cff' }, friction:0.4, restitution:0.3, ...opts });
+    }
+
+    // Center stickman
+    const centerX = width/2; const baseY = height/2 - 60;
+    const head = Bodies.circle(centerX, baseY-60, 18, { density:0.001, restitution:0.1, render:{ fillStyle:'#a0a6ff' }});
+    const torso = rect(centerX, baseY, 26, 90, { density:0.002, render:{ fillStyle:'#4a56d4' }});
+    const upperArmR = rect(centerX-30, baseY-25, 54, 12);
+    const lowerArmR = rect(centerX-70, baseY-25, 54, 12);
+    const upperArmL = rect(centerX+30, baseY-25, 54, 12);
+    const lowerArmL = rect(centerX+70, baseY-25, 54, 12);
+    // Right leg colored
+    const upperLegR = rect(centerX-15, baseY+50, 18, 68, { render:{ fillStyle:'#28c76f' }});
+    const lowerLegR = rect(centerX-15, baseY+110, 16, 70, { render:{ fillStyle:'#1ea7ff' }});
+    const upperLegL = rect(centerX+15, baseY+50, 18, 68);
+    const lowerLegL = rect(centerX+15, baseY+110, 16, 70);
+
+    function pin(bodyA, bodyB, pointA, pointB, len=0, stiff=0.6){ return Constraint.create({ bodyA, bodyB, pointA, pointB, length:len, stiffness:stiff, render:{ strokeStyle:'#3a436f' } }); }
+
+    const joints=[
       pin(head, torso, {x:0,y:18}, {x:0,y:-40}),
       pin(torso, upperArmR, {x:-12,y:-32}, {x:26,y:0}),
       pin(upperArmR, lowerArmR, {x:-26,y:0}, {x:26,y:0}),
@@ -110,30 +116,36 @@
       pin(torso, upperLegL, {x:8,y:40}, {x:0,y:-30}),
       pin(upperLegL, lowerLegL, {x:0,y:30}, {x:0,y:-30}),
     ];
-    const ground = Bodies.rectangle(width/2, height-10, width, 20, { isStatic:true, render:{ fillStyle:'#1d2447' } });
+
+    const ground = Bodies.rectangle(width/2, height-10, width, 20, { isStatic:true, render:{ fillStyle:'#1d2447' }});
     World.add(engine.world, [head, torso, upperArmR, lowerArmR, upperArmL, lowerArmL, upperLegR, lowerLegR, upperLegL, lowerLegL, ...joints, ground]);
+
     const mouse = Mouse.create(render.canvas);
     const mConstraint = MouseConstraint.create(engine, { mouse, constraint:{ stiffness:0.25, render:{ visible:false } } });
     World.add(engine.world, mConstraint);
     Render.run(render); Runner.run(runner, engine);
-    const torqueEl = document.getElementById('torque'); const torqueNum = document.getElementById('torqueNum');
-    const restEl = document.getElementById('rest'); const restNum = document.getElementById('restNum');
-    const balEl = document.getElementById('balance'); const balNum = document.getElementById('balanceNum');
+
+    // UI bindings
+    const torqueEl = document.getElementById('torque'), torqueNum = document.getElementById('torqueNum');
+    const restEl = document.getElementById('rest'), restNum = document.getElementById('restNum');
+    const balEl = document.getElementById('balance'), balNum = document.getElementById('balanceNum');
     const showEnergy = document.getElementById('showEnergy');
-    [ [torqueEl, torqueNum], [restEl, restNum], [balEl, balNum] ].forEach(([r,p])=>{ const sync=()=>{ p.value=r.value; applyTuning(); }; r.addEventListener('input', sync); p.addEventListener('input', ()=>{ r.value=p.value; applyTuning(); }); });
+    [[torqueEl, torqueNum],[restEl,restNum],[balEl,balNum]].forEach(([r,p])=>{ const sync=()=>{ p.value=r.value; applyTuning(); }; r.addEventListener('input',sync); p.addEventListener('input',()=>{ r.value=p.value; applyTuning(); }); });
+
     let torqueScale=1.0, balanceBias=0; applyTuning();
-    function applyTuning(){ const torque=parseFloat(torqueEl.value); const rest=parseFloat(restEl.value); const bal=parseFloat(balEl.value); const bodies=[torso, upperLegL, upperLegR, lowerLegL, lowerLegR, upperArmL, upperArmR, lowerArmL, lowerArmR, head]; for(const b of bodies){ b.restitution=rest; b.friction=Math.max(0.05, 0.8 - rest*0.7);} balanceBias=bal; torqueScale=torque; }
-    let steps=0, lastY=lowerLegR.position.y, time=0; let energyAcc=0; let badFrames=0; const BAD_LIMIT=25; const SAFE_KNEE=75, SAFE_ANKLE=45;
-    const ui = { kneeR:el('kneeR'), ankleR:el('ankleR'), kneeL:el('kneeL'), ankleL:el('ankleL'), resistance:el('resistance'), energy:el('energy'), comfort:el('comfort'), steps:el('steps'), cadence:el('cadence'), pill:el('healthPill'), alert:el('alert'), energyPanel:el('energyPanel') };
-    function el(id){ return document.getElementById(id); }
-    function bodyAngle(a,b){ return (b.angle - a.angle) * 180/Math.PI; }
-    function updateSensors(dt){ const kR=bodyAngle(upperLegR, lowerLegR); const kL=bodyAngle(upperLegL, lowerLegL); const aR=(lowerLegR.angle)*180/Math.PI; const aL=(lowerLegL.angle)*180/Math.PI; ui.kneeR.textContent=kR.toFixed(1)+'°'; ui.kneeL.textContent=kL.toFixed(1)+'°'; ui.ankleR.textContent=aR.toFixed(1)+'°'; ui.ankleL.textContent=aL.toFixed(1)+'°'; ui.resistance.textContent=parseFloat(restEl.value).toFixed(2); const kneeBad = Math.abs(kR)>SAFE_KNEE || Math.abs(kL)>SAFE_KNEE; const ankleBad = Math.abs(aR)>SAFE_ANKLE || Math.abs(aL)>SAFE_ANKLE; if(kneeBad||ankleBad){ badFrames++; } else { badFrames=Math.max(0,badFrames-1); } const warn = badFrames>BAD_LIMIT; ui.alert.style.display = warn? 'block':'none'; ui.pill.className = 'pill ' + (warn? 'warn':'ok'); ui.pill.textContent = warn? 'CHECK':'OK'; }
-    function updateEnergy(dt){ const v = Vector.magnitude(torso.velocity); const effort = torqueScale * (Math.abs(v) + Math.abs(balanceBias)*0.5); energyAcc += effort * dt; const comfort = Math.max(0, 100 - effort*12 - (badFrames>0? badFrames*0.2:0)); ui.energy.textContent = energyAcc.toFixed(2); ui.comfort.textContent = comfort.toFixed(0); ui.energyPanel.style.display = showEnergy.checked? 'block':'none'; }
-    function updateSteps(dt){ const y=lowerLegR.position.y; if(y>lastY && lowerLegR.velocity.y>0.5) { steps++; } lastY=y; ui.steps.textContent = steps; time += dt; ui.cadence.textContent = (steps/Math.max(0.001,time)).toFixed(2); }
-    // Apply bias forces to simulate balance/torque
-    function applyControl(){ const f = { x: balanceBias*0.0008*torqueScale, y: 0 }; [upperLegL, upperLegR, lowerLegL, lowerLegR, torso].forEach(b=>Body.applyForce(b, b.position, f)); }
-    // Main loop hook
-    Matter.Events.on(runner, 'afterTick', ()=>{ const dt=1/60; applyControl(); updateSensors(dt); updateEnergy(dt); updateSteps(dt); });
-  </script>
-</body>
-</html>
+    function applyTuning(){ const torque=parseFloat(torqueEl.value); const rest=parseFloat(restEl.value); const bal=parseFloat(balEl.value); const bodies=[torso,upperLegL,upperLegR,lowerLegL,lowerLegR,upperArmL,upperArmR,lowerArmL,lowerArmR,head]; for(const b of bodies){ b.restitution=rest; b.friction=Math.max(0.05,0.8-rest*0.7);} balanceBias=bal; torqueScale=torque; }
+
+    // Metrics and health
+    let steps=0, lastY, time=0, energyAcc=0, badFrames=0; lastY = lowerLegR.position.y; const BAD_LIMIT=25, SAFE_KNEE=75, SAFE_ANKLE=45;
+    const ui={ kneeR:el('kneeR'), ankleR:el('ankleR'), kneeL:el('kneeL'), ankleL:el('ankleL'), resistance:el('resistance'), energy:el('energy'), comfort:el('comfort'), steps:el('steps'), cadence:el('cadence'), pill:el('healthPill'), alert:el('alert'), energyPanel:el('energyPanel') };
+    function el(id){return document.getElementById(id);} function bodyAngle(a,b){return (b.angle-a.angle)*180/Math.PI;}
+
+    function updateSensors(dt){
+      const kR=bodyAngle(upperLegR,lowerLegR), kL=bodyAngle(upperLegL,lowerLegL);
+      const aR=(lowerLegR.angle)*180/Math.PI, aL=(lowerLegL.angle)*180/Math.PI;
+      ui.kneeR.textContent=kR.toFixed(1)+'°'; ui.kneeL.textContent=kL.toFixed(1)+'°';
+      ui.ankleR.textContent=aR.toFixed(1)+'°'; ui.ankleL.textContent=aL.toFixed(1)+'°';
+      ui.resistance.textContent=parseFloat(restEl.value).toFixed(2);
+      const kneeBad=Math.abs(kR)>SAFE_KNEE || Math.abs(kL)>SAFE_KNEE; const ankleBad=Math.abs(aR)>SAFE_ANKLE || Math.abs(aL)>SAFE_ANKLE; if(kneeBad||ankleBad){ badFrames++; } else { badFrames=Math.max(0,badFrames-1);} const warn=badFrames>BAD_LIMIT; ui.alert.style.display=warn?'block':'none'; ui.pill.className='pill '+(warn?'warn':'ok'); ui.pill.textContent=warn?'CHECK':'OK';
+    }
+    function updateEnergy(dt){ const v=Vector.magnitude(torso.velocity); const effort=torqueScale*(Math.abs(v)+Math.abs(balanceBias)*0.5); energyAcc+=effort*dt; const comfort=Math.max(0,100 - effort*12 - (badFrames>0? badFrames*0.2:0)); ui.energy.textContent=energyAcc.toFixed(2); ui.comfort.textContent=comfort.toFixed(0); ui.energyPanel.style.display=showEnergy.checked?'block':'
