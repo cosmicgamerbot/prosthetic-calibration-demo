@@ -1,218 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <title>Prosthetic Calibration - Ragdoll Stickman</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ragdoll Stickman Demo (Matter.js) - Prosthetic Calibration</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
   <style>
-    body { margin: 0; background: #232332; color: #f2f2f2; font-family: system-ui, sans-serif;}
-    .ui { position: absolute; left: 0; top: 0; width: 320px; background: #232342; min-height: 100vh; padding: 18px 12px 12px 18px;}
-    .ui h2 { margin: 2px 0 10px 0; font-size: 18px; color: #fff; }
-    .ui .group { margin-bottom: 22px; }
-    .ui label { display:block; margin-top:8px;}
-    .ui .num { width:54px;}
-    #main { margin-left: 330px;}
-    #progress { margin: 8px 0;}
-    .cdx { color: #31a4fa; }
-    .cdy { color: #85f27b; }
-    .cgrey { color: #bbb;}
-    #learningbar { width:90%; height: 7px; background:#333; border-radius:5px;}
-    #learningbar > div { background: #31a4fa; height:100%; border-radius:5px;}
+    :root { --bg:#0f1220; --panel:#161a2e; --panel-2:#1c2140; --text:#e6e9f5; --muted:#aab0d6; --accent:#6ae3ff; --alert:#ff6a6a; --ok:#70f0a8; }
+    html, body { height:100%; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:var(--text); background:linear-gradient(180deg,#0b0e1a 0%,#0f1220 100%); display:grid; grid-template-columns:320px 1fr; grid-template-rows:auto 1fr; grid-template-areas:"header header" "sidebar main"; }
+    header { grid-area:header; padding:12px 16px; background:#0b0e1a; border-bottom:1px solid #20264b; display:flex; gap:12px; align-items:center; justify-content:space-between; }
+    header h1 { font-size:16px; margin:0; font-weight:600; letter-spacing:0.2px; }
+    header .sub { color:var(--muted); font-size:12px; }
+    aside { grid-area:sidebar; background:var(--panel); border-right:1px solid #20264b; padding:12px; overflow:auto; }
+    main { grid-area:main; position:relative; }
+    canvas { display:block; margin:0 auto; background:#0c0f1d; }
+    .group { background:var(--panel-2); border:1px solid #20264b; border-radius:8px; padding:10px; margin-bottom:10px; }
+    .group h3 { margin:0 0 8px; font-size:13px; color:var(--muted); font-weight:600; }
+    .kv { display:grid; grid-template-columns:1fr auto; gap:6px 10px; align-items:center; font-size:12px; }
+    .kv .val { color:var(--accent); font-variant-numeric: tabular-nums; }
+    .slider { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; font-size:12px; margin:6px 0; }
+    input[type="range"] { width:100%; accent-color:var(--accent); }
+    .num { width:52px; background:#0e1225; border:1px solid #273061; color:var(--text); padding:4px 6px; border-radius:6px; }
+    .row { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+    .toggle { display:inline-flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); }
+    .toggle input { accent-color:var(--accent); }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:11px; border:1px solid #273061; }
+    .pill.ok { color:var(--ok); background:rgba(112,240,168,0.06); }
+    .pill.warn { color:var(--alert); background:rgba(255,106,106,0.06); }
+    .overlay { position:absolute; right:12px; top:12px; z-index:10; display:grid; gap:8px; max-width:320px; }
+    .overlay .panel { background:rgba(28,33,64,0.85); backdrop-filter: blur(6px); border:1px solid #273061; border-radius:8px; padding:8px 10px; font-size:12px; }
+    .alert { position:absolute; left:50%; transform:translateX(-50%); top:16px; z-index:20; background:#2a1630; border:1px solid #7b2c85; color:#ffd8ff; padding:10px 14px; border-radius:10px; font-size:13px; display:none; }
   </style>
 </head>
 <body>
-<div class="ui">
-<h2>Prosthetic Calibration - Ragdoll Stickman</h2>
-<p style="color:#bbb; font-size: 12px;">Stickman centers on load; right leg highlighted; learns smoother gait over time</p>
-<div class="group"><b>Physics tuning</b>
-  <br>Torque <input type="range" min="0.5" max="3" step="0.01" value="1.0" id="torque"/>
-  <input type="number" min="0.5" max="3" step="0.01" value="1.0" class="num" id="n_torque"/>
-  <br>Restitution <input type="range" min="0.1" max="1.0" step="0.01" value="0.3" id="resti"/>
-  <input type="number" min="0.1" max="1.0" step="0.01" value="0.3" class="num" id="n_resti"/>
-  <br>Balance bias <input type="range" min="-1" max="1" step="0.02" value="0" id="bbias"/>
-  <input type="number" min="-1" max="1" step="0.02" value="0" class="num" id="n_bbias"/>
-  <br>
-  <input type="checkbox" id="showeng"/> Show energy panel
-</div>
-<div class="group"><b>Live metrics</b>
-  <div>Knee (R / L) <span class="cdx" id="kneeR">0</span>° / <span class="cdy" id="kneeL">0</span>°</div>
-  <div>Ankle (R / L) <span class="cdx" id="ankleR">0</span>° / <span class="cdy" id="ankleL">0</span>°</div>
-  <div>Resistance <span class="cgrey" id="resist">0.30</span></div>
-  <div>Comfort <span class="cgrey" id="comfort">100</span></div>
-  <div>Energy <span class="cgrey" id="energy">0.00</span></div>
-  <div>Steps <span class="cgrey" id="steps">0</span></div>
-  <div>Cadence <span class="cgrey" id="cadence">0.00</span></div>
-</div>
-<div class="group"><b>Learning progress</b>
-  <div id="progress"><div id="learningbar"><div style="width:0%"></div></div></div>
-  <div id="lstat" style="color:#6ae3ff;">Initializing gait policy…</div>
-</div>
-</div>
-<div id="main"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-<script>
-const { Engine, Render, World, Bodies, Constraint, Mouse, MouseConstraint, Body, Composite } = Matter;
-let W = 800, H = 600;
-const mainDiv = document.getElementById("main");
-mainDiv.style.position = "relative";
-mainDiv.innerHTML = `<canvas width="${W}" height="${H}" style="display:block;background:#18192c; margin:30px auto 0 auto;border-radius:18px;"></canvas>`;
-const canvas = mainDiv.querySelector("canvas");
-
-// Setup Matter.js
-const engine = Engine.create();
-const render = Render.create({
-  canvas: canvas,
-  engine: engine,
-  options: { width: W, height: H, wireframes: false, background: "#18192c" }
-});
-
-// Start centered
-let cx = W/2, cy = H/2-70;
-
-function makeStickman(centerX, centerY, optics={}) {
-  // Head
-  const head = Bodies.circle(centerX, centerY-50, 23, { restitution:0.4, density:0.01, render: { fillStyle: "#F5DEB3" } });
-  // Torso + Pelvis
-  const torso = Bodies.rectangle(centerX, centerY+22, 27, 76, { density:0.01, render:{ fillStyle: "#666" } });
-
-  // Shoulders
-  const uar = Bodies.rectangle(centerX-38, centerY-10, 48, 13, { density:0.008, render:{ fillStyle: "#777" } }); // right
-  const ual = Bodies.rectangle(centerX+38, centerY-10, 48, 13, { density:0.008, render:{ fillStyle: "#777" } }); // left
-  const lar = Bodies.rectangle(centerX-74, centerY-10, 38, 12, { density:0.008, render:{ fillStyle: "#bbb" } });
-  const lal = Bodies.rectangle(centerX+74, centerY-10, 38, 12, { density:0.008, render:{ fillStyle: "#bbb" } });
-
-  // Legs (right is blue, left is green)
-  const ulr = Bodies.rectangle(centerX-11, centerY+74, 17, 60, { density:0.011, render:{ fillStyle: "#2e80ed" } });
-  const ull = Bodies.rectangle(centerX+11, centerY+74, 17, 60, { density:0.011, render:{ fillStyle: "#85f27b" } });
-  const llr = Bodies.rectangle(centerX-11, centerY+120, 13, 54, { density:0.012, render:{ fillStyle: "#2e80ed" } });
-  const lll = Bodies.rectangle(centerX+11, centerY+120, 13, 54, { density:0.012, render:{ fillStyle: "#85f27b" } });
-
-  // Constraints
-  const cons = [
-    Constraint.create({ bodyA: head, pointA:{x:0,y:23}, bodyB:torso, pointB:{x:0, y:-36}, stiffness: 0.7 }),
-    Constraint.create({ bodyA: torso, pointA:{x:-13, y:-34}, bodyB:uar, pointB:{x:24, y:0}, length: 0, stiffness: 0.6 }),
-    Constraint.create({ bodyA: torso, pointA:{x: 13, y:-34}, bodyB:ual, pointB:{x:-24, y:0}, length: 0, stiffness: 0.6 }),
-    Constraint.create({ bodyA: uar, pointA:{x:-24, y:0}, bodyB:lar, pointB:{x:19,y:0}, length: 0, stiffness: 0.5 }),
-    Constraint.create({ bodyA: ual, pointA:{x:24, y:0}, bodyB:lal, pointB:{x:-19,y:0}, length: 0, stiffness: 0.5 }),
-    // Torso-Hips
-    Constraint.create({ bodyA: torso, pointA:{x:-7, y:38}, bodyB:ulr, pointB:{x:0,y:-30}, stiffness:0.7 }),
-    Constraint.create({ bodyA: torso, pointA:{x:7, y:38}, bodyB:ull, pointB:{x:0,y:-30}, stiffness:0.7 }),
-    // Knees
-    Constraint.create({ bodyA: ulr, pointA:{x:0,y:30}, bodyB:llr, pointB:{x:0,y:-25}, stiffness:0.66 }),
-    Constraint.create({ bodyA: ull, pointA:{x:0,y:30}, bodyB:lll, pointB:{x:0,y:-25}, stiffness:0.66 }),
-    // Feet to ground (light)
-    Constraint.create({ bodyA: llr, pointA:{x:0,y:25}, pointB:{x:centerX-11, y:H-35}, stiffness:0.08, length:10, render:{visible:false} }),
-    Constraint.create({ bodyA: lll, pointA:{x:0,y:25}, pointB:{x:centerX+11, y:H-35}, stiffness:0.08, length:10, render:{visible:false} }),
-  ];
-
-  // Add all to world as an array for later reference
-  World.add(engine.world, [head, torso, uar, ual, lar, lal, ulr, ull, llr, lll]);
-  World.add(engine.world, cons);
-
-  return {head, torso, uar, ual, lar, lal, ulr, ull, llr, lll, cons};
-}
- 
-// Remove previous stickmen on reloads, add one centered
-Composite.clear(engine.world, false, true);
-const ground = Bodies.rectangle(W/2, H-24, W, 26, { isStatic:true, render:{ fillStyle: "#18192c" }});
-World.add(engine.world, ground);
-// Make stickman
-const stick = makeStickman(cx, cy);
-
-// Drag support
-World.add(engine.world, MouseConstraint.create(engine, {
-  mouse: Mouse.create(render.canvas),
-  constraint: { stiffness: 0.4, render: {visible: false } }
-}));
-
-Engine.run(engine); Render.run(render);
-
-// ---- Live learning logic ----
-let learnPct = 0, comfort = 100, unstable = 0, energy = 0, steps = 0, lastFootY = null, frameCount = 0;
-let simulateWalking = false;
-function animateLearningStep() {
-  // Simple simulated learning: every 2s, increase learning %
-  if (learnPct < 100) {
-    learnPct += 0.23;
-    document.getElementById('learningbar').firstElementChild.style.width = `${learnPct|0}%`;
-    if (learnPct > 100) learnPct = 100;
-    // Simulate improved gait! Reduce torque delta, improve restitution, etc.
-    let torque = 1.0 + (1 - learnPct/100)*0.7;
-    let resti = 0.3 + (1-learnPct/100)*0.4;
-    let cval = 100 - (1-learnPct/100)*45;
-    document.getElementById("torque").value = torque.toFixed(2);
-    document.getElementById("resti").value = resti.toFixed(2);
-    comfort = cval|0;
-    document.getElementById("n_torque").value = torque.toFixed(2);
-    document.getElementById("n_resti").value = resti.toFixed(2);
-    document.getElementById("comfort").textContent = comfort;
-    document.getElementById("lstat").textContent = `Learning... gait smoothness ${(comfort|0)}/100`;
-    updateStickmanPhysics(+torque, +resti);
-  } else {
-    document.getElementById("lstat").textContent = "Gait optimized. Comfort at maximum.";
-    simulateWalking = true;
-  }
-  setTimeout(animateLearningStep, 102);
-}
-animateLearningStep();
-
-// Update stickman physics to simulate 'improving'
-function updateStickmanPhysics(torque, resti) {
-  [stick.ulr, stick.ull, stick.llr, stick.lll].forEach(seg => { seg.restitution = resti; });
-  [stick.ulr, stick.llr, stick.uar, stick.lar].forEach(seg => { seg.friction = 0.08+torque*0.02; });
-  [stick.ull, stick.lll, stick.ual, stick.lal].forEach(seg => { seg.friction = 0.08+torque*0.02; });
-}
-// ---- UI binding ----
-let updateUI = () => {
-  // Fake sensor metrics (angles based on positions)
-  let rightKnee = getJointAngle(stick.ulr, stick.llr), leftKnee = getJointAngle(stick.ull, stick.lll);
-  let rightAnkle = getAnkleAngle(stick.llr), leftAnkle = getAnkleAngle(stick.lll);
-
-  document.getElementById("kneeR").textContent = rightKnee|0;
-  document.getElementById("kneeL").textContent = leftKnee|0;
-  document.getElementById("ankleR").textContent = rightAnkle|0;
-  document.getElementById("ankleL").textContent = leftAnkle|0;
-  document.getElementById("resist").textContent = (+document.getElementById("resti").value).toFixed(2);
-  document.getElementById("comfort").textContent = comfort;
-  document.getElementById("energy").textContent = energy.toFixed(2);
-  document.getElementById("steps").textContent = steps;
-  document.getElementById("cadence").textContent = (steps/((frameCount/60)||1)).toFixed(2);
-};
-setInterval(updateUI, 80);
-
-// --- Walking/comfort: simulate step motion after learning ---
-setInterval(()=>{
-  frameCount++;
-  if (simulateWalking && frameCount%30 === 0) {
-    // Nudge hips to step, alternate legs
-    let left = (frameCount%(60*2))<60;
-    let bod = left ? stick.lll : stick.llr;
-    let delta = left ? -2.5 : 2.5;
-    Body.setVelocity(bod, {x:delta, y: -2});
-    steps++;
-    energy += Math.abs(delta)*0.5;
-    if (lastFootY !== null) {
-      comfort += Math.abs(bod.position.y - lastFootY)<3 ? 2 : -2;
-      comfort = Math.max(0, Math.min(comfort, 100));
-    }
-    lastFootY = bod.position.y;
-  }
-},33);
-
-// Utility: calculate angle between two segments
-function getJointAngle(segA, segB) {
-  let dx1 = segA.position.x - stick.torso.position.x, dy1 = segA.position.y - stick.torso.position.y;
-  let dx2 = segB.position.x - segA.position.x, dy2 = segB.position.y - segA.position.y;
-  return Math.abs((Math.atan2(dy2,dx2)-Math.atan2(dy1,dx1))*180/Math.PI)|0;
-}
-function getAnkleAngle(seg) {
-  return Math.abs((Math.atan2(seg.position.y - H+35, seg.position.x - (seg.position.x<cx?cx-11:cx+11))*180/Math.PI))|0;
-}
-// Link UI control sliders
-function sliderControl(id, handler) {
-  let slider = document.getElementById(id), num = document.getElementById('n_'+id);
-  [slider,num].forEach(inp=>{
-    inp.oninput = function() { slider.value = num.value = this.value; handler(+this.value); };
-  });
-}
-sliderControl('torque', v=>updateStickmanPhysics(v, +document.getElementById('resti').value));
-sliderControl('resti', v=>updateStickmanPhysics(+document.getElement
+  <header>
+    <h1>Intelligent Prosthetic Calibration Demo</h1>
+    <div class="sub">Physics ragdoll + sensors + tuning + maintenance alerts</div>
+  </header>
+  <aside>
+    <div class="group">
+      <h3>Sensor Telemetry (simulated)</h3>
+      <div class="kv">
+        <div>Knee Angle (R)</div><div class="val" id="kneeR">0°</div>
+        <div>Ankle Angle (R)</div><div class="val" id="ankleR">0°</div>
+        <div>Knee Angle (L)</div><div class="val" id="kneeL">0°</div>
+        <div>Ankle Angle (L)</div><div class="val" id="ankleL">0°</div>
+        <div>Joint Resistance</div><div class="val" id="resistance">0.00</div>
+      </div>
+    </div>
+    <div class="group">
+      <h3>Manual Tuning</h3>
+      <label class="slider">Torque <input type="range" id="torque" min="0" max="2" step="0.01" value="1"><input class="num" id="torqueNum" type="number" step="0.01" min="0" max="2" value="1"></label>
+      <label class="slider">Resistance <input type="range" id="rest" min="0" max="1" step="0.01" value="0.3"><input class="num" id="restNum" type="number" step="0.01" min="0" max="1" value="0.3"></label>
+      <label class="slider">Balance <input type="range" id="balance" min="-1" max="1" step="0.01" value="0"><input class="num" id="balanceNum" type="number" step="0.01" min="-1" max="1" value="0"></label>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="showEnergy" checked> Show energy & comfort</label>
+        <span id="healthPill" class="pill ok">OK</span>
+      </div>
+    </div>
+    <div class="group">
+      <h3>About</h3>
+      <div style="font-size:12px;color:var(--muted)">
+        - Drag any limb to interact.<br/>
+        - Sliders affect restitution, friction, and body forces.<br/>
+        - Alerts trigger if knee/ankle exceed safe angles for several frames.
+      </div>
+    </div>
+  </aside>
+  <main>
+    <div class="overlay">
+      <div class="panel" id="energyPanel">
+        <div>Energy Expenditure: <span id="energy">0.0</span> J</div>
+        <div>Comfort Score: <span id="comfort">100</span>/100</div>
+      </div>
+      <div class="panel">
+        <div>Step Count: <span id="steps">0</span></div>
+        <div>Cadence: <span id="cadence">0.0</span> steps/s</div>
+      </div>
+    </div>
+    <div id="alert" class="alert">Predictive Alert: Joint misalignment risk. Check knee/ankle configuration.</div>
+  </main>
+  <script>
+    const { Engine, Render, World, Bodies, Body, Constraint, Mouse, MouseConstraint, Runner, Vector } = Matter;
+    const width = 900, height = 560;
+    const engine = Engine.create();
+    const runner = Runner.create();
+    const render = Render.create({ element: document.querySelector('main'), engine, options: { width, height, wireframes: false, background: '#0b0f1f' }});
+    function rect(x, y, w, h, opts={}) { return Bodies.rectangle(x, y, w, h, { chamfer:{ radius: h*0.48 }, render:{ fillStyle:'#6b7cff' }, friction:0.4, restitution:0.3, ...opts }); }
+    const head = Bodies.circle(300, 120, 18, { density:0.001, restitution:0.1, render:{ fillStyle:'#a0a6ff' }});
+    const torso = rect(300, 180, 26, 90, { density:0.002, render:{ fillStyle:'#4a56d4' }});
+    const upperArmR = rect(270, 155, 54, 12);
+    const lowerArmR = rect(230, 155, 54, 12);
+    const upperArmL = rect(330, 155, 54, 12);
+    const lowerArmL = rect(370, 155, 54, 12);
+    const upperLegR = rect(285, 230, 18, 68);
+    const lowerLegR = rect(285, 290, 16, 70);
+    const upperLegL = rect(315, 230, 18, 68);
+    const lowerLegL = rect(315, 290, 16, 70);
+    function pin(bodyA, bodyB, pointA, pointB, len=0, stiff=0.6){ return Constraint.create({ bodyA, bodyB, pointA, pointB, length: len, stiffness: stiff, render:{ strokeStyle:'#3a436f' } }); }
+    const joints = [
+      pin(head, torso, {x:0,y:18}, {x:0,y:-40}),
+      pin(torso, upperArmR, {x:-12,y:-32}, {x:26,y:0}),
+      pin(upperArmR, lowerArmR, {x:-26,y:0}, {x:26,y:0}),
+      pin(torso, upperArmL, {x:12,y:-32}, {x:-26,y:0}),
+      pin(upperArmL, lowerArmL, {x:26,y:0}, {x:-26,y:0}),
+      pin(torso, upperLegR, {x:-8,y:40}, {x:0,y:-30}),
+      pin(upperLegR, lowerLegR, {x:0,y:30}, {x:0,y:-30}),
+      pin(torso, upperLegL, {x:8,y:40}, {x:0,y:-30}),
+      pin(upperLegL, lowerLegL, {x:0,y:30}, {x:0,y:-30}),
+    ];
+    const ground = Bodies.rectangle(width/2, height-10, width, 20, { isStatic:true, render:{ fillStyle:'#1d2447' } });
+    World.add(engine.world, [head, torso, upperArmR, lowerArmR, upperArmL, lowerArmL, upperLegR, lowerLegR, upperLegL, lowerLegL, ...joints, ground]);
+    const mouse = Mouse.create(render.canvas);
+    const mConstraint = MouseConstraint.create(engine, { mouse, constraint:{ stiffness:0.25, render:{ visible:false } } });
+    World.add(engine.world, mConstraint);
+    Render.run(render); Runner.run(runner, engine);
+    const torqueEl = document.getElementById('torque'); const torqueNum = document.getElementById('torqueNum');
+    const restEl = document.getElementById('rest'); const restNum = document.getElementById('restNum');
+    const balEl = document.getElementById('balance'); const balNum = document.getElementById('balanceNum');
+    const showEnergy = document.getElementById('showEnergy');
+    [ [torqueEl, torqueNum], [restEl, restNum], [balEl, balNum] ].forEach(([r,p])=>{ const sync=()=>{ p.value=r.value; applyTuning(); }; r.addEventListener('input', sync); p.addEventListener('input', ()=>{ r.value=p.value; applyTuning(); }); });
+    let torqueScale=1.0, balanceBias=0; applyTuning();
+    function applyTuning(){ const torque=parseFloat(torqueEl.value); const rest=parseFloat(restEl.value); const bal=parseFloat(balEl.value); const bodies=[torso, upperLegL, upperLegR, lowerLegL, lowerLegR, upperArmL, upperArmR, lowerArmL, lowerArmR, head]; for(const b of bodies){ b.restitution=rest; b.friction=Math.max(0.05, 0.8 - rest*0.7);} balanceBias=bal; torqueScale=torque; }
+    let steps=0, lastY=lowerLegR.position.y, time=0; let energyAcc=0; let badFrames=0; const BAD_LIMIT=25; const SAFE_KNEE=75, SAFE_ANKLE=45;
+    const ui = { kneeR:el('kneeR'), ankleR:el('ankleR'), kneeL:el('kneeL'), ankleL:el('ankleL'), resistance:el('resistance'), energy:el('energy'), comfort:el('comfort'), steps:el('steps'), cadence:el('cadence'), pill:el('healthPill'), alert:el('alert'), energyPanel:el('energyPanel') };
+    function el(id){ return document.getElementById(id); }
+    function bodyAngle(a,b){ return (b.angle - a.angle) * 180/Math.PI; }
+    function updateSensors(dt){ const kR=bodyAngle(upperLegR, lowerLegR); const kL=bodyAngle(upperLegL, lowerLegL); const aR=(lowerLegR.angle)*180/Math.PI; const aL=(lowerLegL.angle)*180/Math.PI; ui.kneeR.textContent=kR.toFixed(1)+'°'; ui.kneeL.textContent=kL.toFixed(1)+'°'; ui.ankleR.textContent=aR.toFixed(1)+'°'; ui.ankleL.textContent=aL.toFixed(1)+'°'; ui.resistance.textContent=parseFloat(restEl.value).toFixed(2); const kneeBad = Math.abs(kR)>SAFE_KNEE || Math.abs(kL)>SAFE_KNEE; const ankleBad = Math.abs(aR)>SAFE_ANKLE || Math.abs(aL)>SAFE_ANKLE; if(kneeBad||ankleBad){ badFrames++; } else { badFrames=Math.max(0,badFrames-1); } const warn = badFrames>BAD_LIMIT; ui.alert.style.display = warn? 'block':'none'; ui.pill.className = 'pill ' + (warn? 'warn':'ok'); ui.pill.textContent = warn? 'CHECK':'OK'; }
+    function updateEnergy(dt){ const v = Vector.magnitude(torso.velocity); const effort = torqueScale * (Math.abs(v) + Math.abs(balanceBias)*0.5); energyAcc += effort * dt; const comfort = Math.max(0, 100 - effort*12 - (badFrames>0? badFrames*0.2:0)); ui.energy.textContent = energyAcc.toFixed(2); ui.comfort.textContent = comfort.toFixed(0); ui.energyPanel.style.display = showEnergy.checked? 'block':'none'; }
+    function updateSteps(dt){ const y=lowerLegR.position.y; if(y>lastY && lowerLegR.velocity.y>0.5) { steps++; } lastY=y; ui.steps.textContent = steps; time += dt; ui.cadence.textContent = (steps/Math.max(0.001,time)).toFixed(2); }
+    // Apply bias forces to simulate balance/torque
+    function applyControl(){ const f = { x: balanceBias*0.0008*torqueScale, y: 0 }; [upperLegL, upperLegR, lowerLegL, lowerLegR, torso].forEach(b=>Body.applyForce(b, b.position, f)); }
+    // Main loop hook
+    Matter.Events.on(runner, 'afterTick', ()=>{ const dt=1/60; applyControl(); updateSensors(dt); updateEnergy(dt); updateSteps(dt); });
+  </script>
+</body>
+</html>
